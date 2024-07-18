@@ -139,7 +139,7 @@ const WalletController = {
         );
         sendNotification(
           studentOb.userId,
-          `Your tutorMe Wallet has been credited by Rs.${
+          `Your EduLoom Wallet has been credited by Rs.${
             total_amount / 100
           }. New Balance: ${studentOb.walletBalance}`,
           "payment"

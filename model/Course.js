@@ -85,6 +85,10 @@ const courseSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  isCompleted: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model("Course", courseSchema);

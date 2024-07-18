@@ -9,8 +9,21 @@ const tempUserSchema = new mongoose.Schema({
   otpExpiresAt: { type: Date, required: true },
   profileImage: { type: String },
   bio: { type: String },
-  exprience: { type: String, required: true },
-  teachingIntrests: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subject" }],
+  experience: [{ type: String }], // Array of experience points
+  teachingIntrests: [{ type: String }], // Array of teaching interests
+});
+
+// Add custom validation for experience field
+tempUserSchema.pre("save", function (next) {
+  if (
+    this.role === "tutor" &&
+    (!this.experience || this.experience.length === 0)
+  ) {
+    return next(
+      new Error("At least one experience point is required for tutors")
+    );
+  }
+  next();
 });
 
 const TempUser = mongoose.model("TempUser", tempUserSchema);

@@ -1,10 +1,10 @@
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../model/User");
-const Student = require("../model/student");
+const Student = require("../model/Student");
 const Tutor = require("../model/Tutor");
-const Subject = require("../model/subject");
-const TempUser = require("../model/tempUser");
+const Subject = require("../model/Subject");
+const TempUser = require("../model/TempUser");
 const { sendEmail } = require("../utils/emailService");
 
 const SECRET_KEY =
@@ -17,8 +17,16 @@ const generateOTP = () => {
 const register = async (req, res) => {
   console.log("signup attempt:", req.body);
   try {
-    const { name, email, password, role, bio, exprience, teachingIntrests } =
-      req.body;
+    const {
+      name,
+      email,
+      password,
+      role,
+      bio,
+      experience,
+      teachingIntrests,
+      profileImage: profileImageUrl,
+    } = req.body;
     const existingTempUser = await TempUser.findOne({ email });
     const existingUser = await User.findOne({ email });
     if (existingTempUser || existingUser) {
@@ -28,14 +36,17 @@ const register = async (req, res) => {
     }
 
     const hashedPassword = await bcryptjs.hash(password, 10);
-
     const otp = generateOTP();
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
+    // Handle profile image from either file upload or direct URL
     let profileImage = null;
     if (req.file) {
       profileImage = req.file.path;
+    } else if (profileImageUrl) {
+      profileImage = profileImageUrl;
     }
+
     const tempUser = new TempUser({
       name,
       email,
@@ -44,7 +55,7 @@ const register = async (req, res) => {
       otp,
       otpExpiresAt,
       profileImage,
-      ...(role === "tutor" && { bio, exprience, teachingIntrests }),
+      ...(role === "tutor" && { bio, experience, teachingIntrests }),
     });
     await tempUser.save();
     const htmlContent = `
@@ -140,14 +151,14 @@ const register = async (req, res) => {
         </div>
             <p style="color:#ffffff">This code will expire in minutes. If you did not request this, please ignore this message.</p>
             <p style="color:#ffffff">Cheers!<br>
-            TutorMe Team<br>
+            EduLoom Team<br>
             </p>
         </div>
         <div class="footer">
           
-            <small>This is an automated email sent on behalf of tutorMe. Please do not reply to this email.</small><br>
+            <small>This is an automated email sent on behalf of EduLoom. Please do not reply to this email.</small><br>
             Kathmandu, Nepal<br>
-            &copy; 2024 TutorMe
+            &copy; 2024 EduLoom
         </div>
     </div>
 </body>
@@ -161,9 +172,6 @@ const register = async (req, res) => {
       "Your OTP is ready.",
       htmlContent
     );
-
-    // Send OTP to user's email
-    // await sendEmail(email, "Verify Your Email", `Dear ${name}, \n Your OTP for email verification is: ${otp}. \n This OTP is valid for 5 minutes. \n Thank you!, \n Team TutorMe`);
 
     res.status(201).json({
       message:
@@ -194,11 +202,8 @@ const verifyEmail = async (req, res) => {
         password,
         role,
         bio,
-        description,
-        hourlyRate,
-        subjects,
         profileImage,
-        exprience,
+        experience,
         teachingIntrests,
       } = tempUser;
 
@@ -212,28 +217,14 @@ const verifyEmail = async (req, res) => {
         });
         await newStudent.save();
       } else if (role === "tutor") {
-        // Create subject references if needed
-        let subjectIds = [];
-        if (subjects && subjects.length > 0) {
-          subjectIds = await Promise.all(
-            subjects.map(async (subjectName) => {
-              let subject = await Subject.findOne({ name: subjectName });
-              if (!subject) {
-                subject = new Subject({ name: subjectName });
-                await subject.save();
-              }
-              return subject._id;
-            })
-          );
-        }
-
         const newTutor = new Tutor({
           userId: newUser._id,
           bio,
-          exprience,
-          teachingIntrests,
+          experience: Array.isArray(experience) ? experience : [experience],
+          teachingIntrests: Array.isArray(teachingIntrests)
+            ? teachingIntrests
+            : [teachingIntrests],
           profileImage,
-          subjects: subjectIds,
         });
         await newTutor.save();
       }
@@ -243,15 +234,14 @@ const verifyEmail = async (req, res) => {
       return res.status(200).json({
         message: "Email verified successfully. Registration complete.",
       });
-    } else {
-      // Either OTP is wrong or expired
-      return res.status(400).json({
-        message:
-          tempUser.otp !== otp
-            ? "Invalid OTP"
-            : "OTP has expired. Please request a new one.",
-      });
     }
+    // Either OTP is wrong or expired
+    return res.status(400).json({
+      message:
+        tempUser.otp !== otp
+          ? "Invalid OTP"
+          : "OTP has expired. Please request a new one.",
+    });
   } catch (error) {
     console.error("Error during email verification:", error);
     res.status(500).json({ message: error.message });
@@ -287,7 +277,7 @@ const verifyEmail = async (req, res) => {
 //       hourlyRate,
 //       subjects,
 //       profileImage,
-//       exprience,
+//       experience,
 //       teachingIntrests,
 //     } = tempUser;
 //     const newUser = new User({ name, email, password, role });
@@ -317,7 +307,7 @@ const verifyEmail = async (req, res) => {
 //       const newTutor = new Tutor({
 //         userId: newUser._id,
 //         bio,
-//         exprience,
+//         experience,
 //         teachingIntrests,
 //         profileImage,
 //       });
@@ -468,7 +458,7 @@ const resendOTP = async (req, res) => {
     <div class="container">
         <div class="header">
             <!-- Replace src with the path to your logo image -->
-            <h1>TutorMe</h1>
+            <h1>EduLoom</h1>
             // <img src="https://i.postimg.cc/tJh83M61/logostroke.png" alt="Logo">
         </div>
         <div class="content">
@@ -480,14 +470,14 @@ const resendOTP = async (req, res) => {
 
             <p style="color:#ffffff">This code will expire in minutes. If you did not request this, please ignore this message.</p>
             <p style="color:#ffffff">Cheers!<br>
-            TutorMe Team<br>
+            EduLoom Team<br>
             </p>
         </div>
         <div class="footer">
           
-            <small>This is an automated email sent on behalf of tutorMe. Please do not reply to this email.</small><br>
+            <small>This is an automated email sent on behalf of EduLoom. Please do not reply to this email.</small><br>
             Kathmandu, Nepal<br>
-            &copy; 2024 TutorMe
+            &copy; 2024 EduLoom
         </div>
     </div>
 </body>

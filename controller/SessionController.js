@@ -1,7 +1,9 @@
 const Session = require("../model/Session");
-const Student = require("../model/student");
-const Tutor = require("../model/tutor");
+const Student = require("../model/Student");
+const Tutor = require("../model/Tutor");
 const User = require("../model/User");
+const Course = require("../model/Course");
+const Lesson = require("../model/Lesson");
 const Earning = require("../model/Earning");
 const Transaction = require("../model/Transaction");
 const { sendNotification } = require("../utils/notifications");
@@ -14,42 +16,74 @@ require("dotenv").config();
 const PLATFORM_COMMISSION = 0.2;
 const JAAAS_APP_ID = process.env.JAAS_APP_ID;
 const JAAAS_API_KEY = process.env.JAAS_API_KEY;
-const JAAAS_SECRET = process.env.JAAS_SECRET; 
+const JAAAS_SECRET = process.env.JAAS_SECRET;
 const privateKey = process.env.JAAS_PRIVATE_KEY;
 
 async function getJaaSToken(req, res) {
   try {
-    const { bookingId } = req.params;
-    const session = await Session.findOne({ bookingId })
+    const { lessonId } = req.params;
+    const session = await Session.findOne({ lessonId })
       .populate({
         path: "tutorId",
         populate: { path: "userId", select: "name email _id" },
       })
-      .populate({
-        path: "studentId",
-        populate: { path: "userId", select: "name email _id" },
-      });
+      .populate("courseId");
 
     if (!session || !session.roomId) {
       return res.status(404).json({ message: "Session or room not found." });
     }
-    // console.log("Inside (getjaastoken) Session Data:", session);
+
     const user = await User.findById(req.user.id);
-    console.log("User Data:", user, "req ma aako user data:", req.user);
-    // const isTutor = session.tutorId.userId.toString() === user._id.toString();
-    console.log("role in req: ", req.user.role);
     const isTutor = req.user.role === "tutor";
-    console.log(" jaas token magne User Role:", User.role, "isTutor:", isTutor);
+
+    // Validate access permissions
+    if (isTutor) {
+      // Check if user is the tutor of this session
+      if (session.tutorId.userId._id.toString() !== user._id.toString()) {
+        return res
+          .status(403)
+          .json({ message: "You are not the tutor of this session." });
+      }
+    } else {
+      // Check if user is a student enrolled in the course
+      const student = await Student.findOne({ userId: user._id });
+      if (!student) {
+        return res.status(403).json({ message: "Student profile not found." });
+      }
+
+      // Check if student is enrolled in the course
+      const isEnrolled = session.courseId.students.some(
+        (studentId) => studentId.toString() === student._id.toString()
+      );
+      if (!isEnrolled) {
+        return res
+          .status(403)
+          .json({ message: "You are not enrolled in this course." });
+      }
+
+      // Check if session is in progress
+      if (session.status !== "in-progress") {
+        return res
+          .status(403)
+          .json({ message: "Session is not currently active." });
+      }
+    }
+
+    const userData = isTutor ? session.tutorId.userId : user;
+    const profileData = isTutor ? session.tutorId : user;
+
+    // Use lessonId as room name (same as in startSession)
     const roomName = session.roomId;
-    const userData = isTutor
-      ? session.tutorId.userId
-      : session.studentId.userId;
-    const profileData = isTutor ? session.tutorId : session.studentId;
+    // Temporarily use simple name for testing
+
+    console.log("Debug - session.roomId:", session.roomId);
+    console.log("Debug - using roomName:", roomName);
+
     const payload = {
       aud: "jitsi",
       iss: "chat",
       sub: JAAAS_APP_ID,
-      room: roomName.split("/")[1], // Specific room only
+      room: roomName,
       exp: Math.floor(Date.now() / 1000) + 3600,
       context: {
         user: {
@@ -65,17 +99,19 @@ async function getJaaSToken(req, res) {
         },
       },
     };
-    console.log(
-      "JWT Payload for user:",
-      user._id,
-      "Role:",
-      isTutor ? "Tutor" : "Student",
-      payload
-    );
+
+    console.log("Debug - JWT Payload:", JSON.stringify(payload, null, 2));
+    console.log("Debug - JAAS_APP_ID:", JAAAS_APP_ID);
+    console.log("Debug - JAAS_SECRET:", JAAAS_SECRET ? "Present" : "Missing");
+    console.log("Debug - privateKey:", privateKey ? "Present" : "Missing");
+
     const token = jwt.sign(payload, privateKey, {
       algorithm: "RS256",
       header: { kid: JAAAS_SECRET, typ: "JWT" },
     });
+
+    console.log("Debug - Generated token length:", token.length);
+    console.log("Debug - Token preview:", token.substring(0, 50) + "...");
 
     res.status(200).json({ success: true, token });
   } catch (error) {
@@ -86,17 +122,15 @@ async function getJaaSToken(req, res) {
 
 async function getSessionRoom(req, res) {
   try {
-    const { bookingId } = req.params;
-    const session = await Session.findOne({ bookingId });
-
+    const { lessonId } = req.params;
+    const session = await Session.findOne({ lessonId });
     if (!session) {
       return res.status(404).json({ message: "Session not found." });
     }
-
     res.status(200).json({
       success: true,
       roomId: session.roomId,
-      roomPassword: session,
+      roomPassword: session.roomPassword,
       startTime: session.startTime,
       status: session.status,
     });
@@ -108,33 +142,27 @@ async function getSessionRoom(req, res) {
 
 async function startSession(req, res) {
   try {
-    const { bookingId } = req.params;
-    const session = await Session.findOne({ bookingId }).populate(
-      "studentId tutorId"
-    );
-
+    const { lessonId } = req.params;
+    const session = await Session.findOne({ lessonId }).populate("tutorId");
     if (!session) {
       return res.status(404).json({ message: "Session not found." });
     }
-
     if (session.status !== "scheduled") {
       return res
         .status(400)
         .json({ message: "Session has already started or ended." });
     }
-
     const user = await User.findById(req.user.id);
     const isTutor = session.tutorId.userId.toString() === user._id.toString();
-
     if (!isTutor) {
       return res
         .status(403)
         .json({ message: "Only tutors can start sessions." });
     }
 
-    // Generate room credentials
-    const roomId = `${JAAAS_APP_ID}/${bookingId}`;
-    const roomPassword = crypto.randomBytes(8).toString("hex"); 
+    // Use lessonId as room name for simplicity
+    const roomId = lessonId;
+    const roomPassword = crypto.randomBytes(8).toString("hex");
 
     session.status = "in-progress";
     session.startTime = new Date();
@@ -142,12 +170,9 @@ async function startSession(req, res) {
     session.roomPassword = roomPassword;
     await session.save();
 
-    sendNotification(
-      session.studentId.userId,
-      "Your session has started! Join now."
-    );
-    sendNotification(session.tutorId.userId, "You have started the session.");
+    console.log("Debug - Created roomId:", roomId);
 
+    sendNotification(session.tutorId.userId, "You have started the session.");
     res.status(200).json({
       success: true,
       message: "Session started successfully.",
@@ -161,79 +186,80 @@ async function startSession(req, res) {
 
 async function endSession(req, res) {
   try {
-    const { bookingId } = req.params;
-    const session = await Session.findOne({ bookingId }).populate(
-      "studentId tutorId"
-    );
-
+    const { lessonId } = req.params;
+    const session = await Session.findOne({ lessonId }).populate("tutorId");
     if (!session) {
       return res.status(404).json({ message: "Session not found." });
     }
-
     if (session.status !== "in-progress") {
       return res.status(400).json({ message: "Session is not ongoing." });
     }
-
     const user = await User.findById(req.user.id);
     const isTutor = session.tutorId.userId.toString() === user._id.toString();
-
     if (!isTutor) {
       return res.status(403).json({ message: "Only tutors can end sessions." });
     }
-
     const endTime = new Date();
     const durationInMs = endTime - new Date(session.startTime);
     const durationInHours = durationInMs / (1000 * 60 * 60);
     session.duration = durationInHours;
-
-    const student = session.studentId;
-    const tutor = session.tutorId;
-    const hourlyRate = tutor.hourlyRate;
-    const totalCharge = hourlyRate * durationInHours;
-    const platformFee = totalCharge * PLATFORM_COMMISSION;
-    const tutorEarnings = totalCharge - platformFee;
     session.status = "completed";
-    session.tutorEarnings = tutorEarnings;
-    session.totalFee = totalCharge;
-    session.platformFee = platformFee;
     session.endTime = endTime;
-    session.actualDuration = durationInHours;
     await session.save();
-
-    if (student.walletBalance < totalCharge) {
-      return res.status(400).json({ message: "Insufficient balance." });
-    }
-
-    student.walletBalance -= totalCharge;
-    const earning = new Earning({
-      tutorId: tutor._id,
-      studentId: session.studentId,
-      amount: tutorEarnings,
-      type: "SessionFee",
-    });
-    await earning.save();
-    tutor.walletBalance += tutorEarnings;
-    await Promise.all([student.save(), tutor.save()]);
-
-    sendNotification(
-      student.userId,
-      `Your session has ended. Rs.${totalCharge} has been deducted from your wallet.`
-    );
-    sendNotification(
-      tutor.userId,
-      `Bravo! Session completed. Rs. ${tutorEarnings} credited!`
-    );
-
     res.status(200).json({
       success: true,
       message: "Session ended successfully.",
       duration: durationInHours,
-      totalCharge,
     });
-    console.log("Session ended successfully.");
   } catch (error) {
     console.error("Error ending session:", error);
     res.status(500).json({ message: "Failed to end session." });
+  }
+}
+
+// Student joins a session (adds to attendees if enrolled in the course)
+async function joinSession(req, res) {
+  try {
+    const { lessonId } = req.params;
+    const userId = req.user.id;
+    const student = await Student.findOne({ userId });
+    if (!student) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized. Student not found." });
+    }
+    const session = await Session.findOne({ lessonId });
+    if (!session) {
+      return res.status(404).json({ message: "Session not found." });
+    }
+    // Check enrollment
+    const lesson = await Lesson.findById(lessonId);
+    if (!lesson) {
+      return res.status(404).json({ message: "Lesson not found." });
+    }
+    const course = await Course.findById(session.courseId);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found." });
+    }
+    const isEnrolled = course.students.some(
+      (studentId) => studentId.toString() === student._id.toString()
+    );
+    if (!isEnrolled) {
+      return res
+        .status(403)
+        .json({ message: "You are not enrolled in this course." });
+    }
+    // Add to attendees if not already present
+    if (!session.attendees.includes(student._id)) {
+      session.attendees.push(student._id);
+      await session.save();
+    }
+    res
+      .status(200)
+      .json({ success: true, message: "Joined session successfully." });
+  } catch (error) {
+    console.error("Error joining session:", error);
+    res.status(500).json({ message: "Failed to join session." });
   }
 }
 
@@ -247,34 +273,28 @@ const getTutorSessions = async (req, res) => {
     }
 
     const sessions = await Session.find({ tutorId: tutor._id })
-      .populate("studentId", "userId")
-      .populate({
-        path: "studentId",
-        populate: { path: "userId", select: "name email profileImage" },
-      })
-      .select("-__v -createdAt -updatedAt")
-      .sort({ date: -1 });
+      .populate("lessonId", "title") // Only get title from lesson
+      .populate("courseId", "title") // Only get title from course
+      .lean() // Convert to plain JavaScript object
+      .exec();
 
-    const modifiedSessions = sessions.map((session) => ({
-      sessionId: session._id,
-      bookingId: session.bookingId,
-      studentId: session.studentId._id,
-      studentName: session.studentId.userId.name,
-      studentEmail: session.studentId.userId.email,
-      profileImage: session.studentId.userId.profileImage,
-      roomId: session.roomId,
-      date: session.date,
-      startTime: session.startTime,
-      endTime: session.endTime,
+    // Transform the data before sending
+    const simplifiedSessions = sessions.map((session) => ({
+      _id: session._id,
+      scheduledDate: session.scheduledDate,
+      startTime: session.startTime || "",
       status: session.status,
-      duration: session.duration,
-      actualDuration: session.actualDuration,
-      totalFee: session.totalFee,
-      platformFee: session.platformFee,
-      tutorEarnings: session.tutorEarnings,
+      lessonId: {
+        _id: session.lessonId?._id,
+        title: session.lessonId?.title || "Untitled Lesson",
+      },
+      courseId: {
+        _id: session.courseId?._id,
+        title: session.courseId?.title || "Untitled Course",
+      },
     }));
 
-    res.status(200).json({ success: true, sessions: modifiedSessions });
+    res.status(200).json({ success: true, sessions: simplifiedSessions });
   } catch (error) {
     console.error("Error fetching tutor sessions:", error);
     res.status(500).json({ message: "Failed to fetch tutor sessions." });
@@ -290,39 +310,36 @@ const getStudentSessions = async (req, res) => {
         .json({ message: "Unauthorized. Student not found." });
     }
 
-    // if (!mongoose.Types.ObjectId.isValid(student._id)) {
-    //   return res.status(400).json({ message: "Invalid student ID." });
-    // }
+    // Get all courses the student is enrolled in
+    const enrolledCourses = await Course.find({ students: student._id });
+    const courseIds = enrolledCourses.map((course) => course._id);
 
-    const sessions = await Session.find({ studentId: student._id })
-      .populate("tutorId", "userId")
-      .populate({
-        path: "tutorId",
-        populate: { path: "userId", select: "name email profileImage" },
-      })
-      .select("-__v -createdAt -updatedAt")
-      .sort({ date: -1 });
+    // Find all sessions from enrolled courses
+    const sessions = await Session.find({
+      courseId: { $in: courseIds },
+    })
+      .populate("lessonId", "title")
+      .populate("courseId", "title")
+      .lean()
+      .exec();
 
-    const modifiedSessions = sessions.map((session) => ({
-      sessionId: session._id,
-      bookingId: session.bookingId,
-      tutorId: session.tutorId._id,
-      tutorName: session.tutorId.userId.name,
-      tutorEmail: session.tutorId.userId.email,
-      profileImage: session.tutorId.userId.profileImage,
-      roomId: session.roomId,
-      date: session.date,
-      startTime: session.startTime,
-      endTime: session.endTime,
+    // Transform the data before sending
+    const simplifiedSessions = sessions.map((session) => ({
+      _id: session._id,
+      scheduledDate: session.scheduledDate,
+      startTime: session.startTime || "",
       status: session.status,
-      duration: session.duration,
-      actualDuration: session.actualDuration,
-      totalFee: session.totalFee,
-      platformFee: session.platformFee,
-      tutorEarnings: session.tutorEarnings,
+      lessonId: {
+        _id: session.lessonId?._id,
+        title: session.lessonId?.title || "Untitled Lesson",
+      },
+      courseId: {
+        _id: session.courseId?._id,
+        title: session.courseId?.title || "Untitled Course",
+      },
     }));
 
-    res.status(200).json({ success: true, sessions: modifiedSessions });
+    res.status(200).json({ success: true, sessions: simplifiedSessions });
   } catch (error) {
     console.error("Error fetching student sessions:", error);
     res.status(500).json({ message: "Failed to fetch student sessions." });
@@ -336,4 +353,5 @@ module.exports = {
   getJaaSToken,
   getTutorSessions,
   getStudentSessions,
+  joinSession,
 };

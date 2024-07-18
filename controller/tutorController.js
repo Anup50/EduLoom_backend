@@ -4,6 +4,7 @@ const User = require("../model/User");
 const Course = require("../model/Course");
 const bcryptjs = require("bcryptjs");
 const cloudinary = require("../utils/cloudinary");
+const Enrollment = require("../model/Enrollment");
 
 const getTutors = async (req, res) => {
   try {
@@ -90,7 +91,14 @@ const getTutors = async (req, res) => {
 const updateTutorProfile = async (req, res) => {
   try {
     const tutorId = req.user.id;
-    const { bio, description, hourlyRate, availability } = req.body;
+    const {
+      bio,
+      description,
+      hourlyRate,
+      availability,
+      teachingIntrests,
+      experience,
+    } = req.body;
 
     const updateFields = {};
 
@@ -98,7 +106,16 @@ const updateTutorProfile = async (req, res) => {
     if (description) updateFields.description = description;
     if (hourlyRate) updateFields.hourlyRate = hourlyRate;
     if (availability) updateFields.availability = availability;
-    // if (profileImage) updateFields.profileImage = profileImage;
+    if (experience && Array.isArray(experience)) {
+      updateFields.experience = experience
+        .map((exp) => exp.trim())
+        .filter(Boolean);
+    }
+    if (teachingIntrests && Array.isArray(teachingIntrests)) {
+      updateFields.teachingIntrests = teachingIntrests
+        .map((interest) => interest.trim())
+        .filter(Boolean);
+    }
 
     if (req.file) {
       const uploadResult = await cloudinary.uploader.upload(req.file.path, {
@@ -108,43 +125,11 @@ const updateTutorProfile = async (req, res) => {
       console.log("uploadResult:", uploadResult);
     }
 
-    // if (subjects) {
-    //   const subjectIds = await Promise.all(
-    //     subjects.map(async (subjectName) => {
-    //       let subject = await Subject.findOne({ name: subjectName });
-    //       if (!subject) {
-    //         subject = new Subject({ name: subjectName });
-    //         await subject.save();
-    //       }
-    //       return subject._id;
-    //     })
-    //   );
-    //   updateFields.subjects = subjectIds;
-    // }
-    // if (subjects) {
-    //   const subjectIds = await Promise.all(
-    //     subjects.map(async (subjectName) => {
-    //       let subject = await Subject.findOne({ name: subjectName });
-    //       if (!subject) {
-    //         subject = new Subject({ name: subjectName });
-    //         await subject.save();
-    //       }
-    //       return subject._id;
-    //     })
-    //   );
-
-    //   updateFields.subjects = subjectIds;
-    // }
-
-    // if (profileImage) {
-    //   updateFields.profileImage = profileImage; // Add profile picture if uploaded
-    // }
-
     const updatedTutor = await Tutor.findOneAndUpdate(
       { userId: tutorId },
       { $set: updateFields },
       { new: true }
-    ).populate("name");
+    ).populate("userId", "name email profileImage");
 
     if (!updatedTutor) {
       return res
@@ -165,15 +150,34 @@ const getTutorProfile = async (req, res) => {
   try {
     const tutorId = req.user.id;
 
-    const tutor = await Tutor.findOne({ userId: tutorId })
-      .populate("userId", "name email profileImage")
-      .populate("teachingIntrests", "name");
+    const tutor = await Tutor.findOne({ userId: tutorId }).populate(
+      "userId",
+      "name email profileImage"
+    );
 
     if (!tutor) {
       return res.status(404).json({ message: "Tutor profile not found" });
     }
 
-    const coursesCount = await Course.countDocuments({ tutor: tutor._id });
+    // Get all courses by this tutor
+    const courses = await Course.find({ tutor: tutor._id });
+    const coursesCount = courses.length;
+
+    // Get total unique students enrolled in tutor's courses
+    const enrollments = await Enrollment.find({
+      course: { $in: courses.map((course) => course._id) },
+    }).distinct("student");
+
+    const totalStudents = enrollments.length;
+
+    // Ensure arrays are properly handled
+    const teachingInterests = Array.isArray(tutor.teachingIntrests)
+      ? tutor.teachingIntrests.filter((interest) => interest)
+      : [];
+
+    const experience = Array.isArray(tutor.experience)
+      ? tutor.experience.filter((exp) => exp)
+      : [];
 
     const tutorProfile = {
       id: tutor._id,
@@ -181,12 +185,13 @@ const getTutorProfile = async (req, res) => {
       email: tutor.userId.email,
       profileImage: tutor.profileImage || tutor.userId.profileImage,
       bio: tutor.bio,
-      exprience: tutor.exprience,
-      teachingIntrests: tutor.teachingIntrests.map((subj) => subj.name),
+      experience: experience,
+      teachingIntrests: teachingInterests,
       walletBalance: tutor.walletBalance,
       dateJoined: tutor.dateJoined,
       rating: tutor.rating,
       coursesPublished: coursesCount,
+      totalStudents: totalStudents,
     };
 
     res.status(200).json({
