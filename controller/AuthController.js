@@ -202,6 +202,9 @@ const verifyEmail = async (req, res) => {
         password,
         role,
         bio,
+        description,
+        hourlyRate,
+        subjects,
         profileImage,
         experience,
         teachingIntrests,
@@ -217,14 +220,28 @@ const verifyEmail = async (req, res) => {
         });
         await newStudent.save();
       } else if (role === "tutor") {
+        // Create subject references if needed
+        let subjectIds = [];
+        if (subjects && subjects.length > 0) {
+          subjectIds = await Promise.all(
+            subjects.map(async (subjectName) => {
+              let subject = await Subject.findOne({ name: subjectName });
+              if (!subject) {
+                subject = new Subject({ name: subjectName });
+                await subject.save();
+              }
+              return subject._id;
+            })
+          );
+        }
+
         const newTutor = new Tutor({
           userId: newUser._id,
           bio,
-          experience: Array.isArray(experience) ? experience : [experience],
-          teachingIntrests: Array.isArray(teachingIntrests)
-            ? teachingIntrests
-            : [teachingIntrests],
+          experience,
+          teachingIntrests,
           profileImage,
+          subjects: subjectIds,
         });
         await newTutor.save();
       }
@@ -234,97 +251,21 @@ const verifyEmail = async (req, res) => {
       return res.status(200).json({
         message: "Email verified successfully. Registration complete.",
       });
+    } else {
+      // Either OTP is wrong or expired
+      return res.status(400).json({
+        message:
+          tempUser.otp !== otp
+            ? "Invalid OTP"
+            : "OTP has expired. Please request a new one.",
+      });
     }
-    // Either OTP is wrong or expired
-    return res.status(400).json({
-      message:
-        tempUser.otp !== otp
-          ? "Invalid OTP"
-          : "OTP has expired. Please request a new one.",
-    });
   } catch (error) {
     console.error("Error during email verification:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// const verifyEmail = async (req, res) => {
-//   console.log("verify otp attempt:", req.body);
-
-//   try {
-//     const { email, otp } = req.body;
-
-//     const tempUser = await TempUser.findOne({ email });
-//     if (!tempUser) {
-//       return res
-//         .status(404)
-//         .json({ message: "User not found or already verified" });
-//     }
-
-//     if (tempUser.otp !== otp) {
-//       return res.status(400).json({ message: "Invalid OTP" });
-//     }
-//     if (tempUser.otpExpiresAt < Date.now()) {
-//       return res.status(400).json({ message: "OTP has expired" });
-//     }
-
-//     const {
-//       name,
-//       password,
-//       role,
-//       bio,
-//       description,
-//       hourlyRate,
-//       subjects,
-//       profileImage,
-//       experience,
-//       teachingIntrests,
-//     } = tempUser;
-//     const newUser = new User({ name, email, password, role });
-//     await newUser.save();
-
-//     // Role-specific logic
-//     if (role === "student") {
-//       const newStudent = new Student({ userId: newUser._id, profileImage });
-//       await newStudent.save();
-//     } else if (role === "tutor") {
-//       const { bio, description, hourlyRate, subjects, profileImage } = tempUser;
-
-//       let subjectIds = [];
-//       if (subjects && subjects.length > 0) {
-//         subjectIds = await Promise.all(
-//           subjects.map(async (subjectName) => {
-//             let subject = await Subject.findOne({ name: subjectName });
-//             if (!subject) {
-//               subject = new Subject({ name: subjectName });
-//               await subject.save();
-//             }
-//             return subject._id;
-//           })
-//         );
-//       }
-
-//       const newTutor = new Tutor({
-//         userId: newUser._id,
-//         bio,
-//         experience,
-//         teachingIntrests,
-//         profileImage,
-//       });
-//       await newTutor.save();
-//     }
-
-//     await TempUser.deleteOne({ email });
-
-//     res
-//       .status(200)
-//       .json({ message: "Email verified successfully. Registration complete." });
-//     console.log("Email verified successfully. Registration complete.");
-//   } catch (error) {
-//     console.error("Error during email verification:", error);
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 
 const login = async (req, res) => {
   console.log("login attempt:", req.body);

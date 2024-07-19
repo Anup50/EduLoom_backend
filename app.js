@@ -26,6 +26,7 @@ const QuizRoute = require("./routes/QuizRoute");
 const CourseRoute = require("./routes/CourseRoute");
 const Cloudinary = require("./routes/Cloudinary");
 const QuizResultRoute = require("./routes/QuizResultRoute");
+const ContactRoute = require("./routes/ContactRoute");
 const app = express();
 const server = http.createServer(app);
 
@@ -145,6 +146,7 @@ app.use("/api/quizzes", QuizRoute);
 app.use("/api/courses", CourseRoute);
 app.use("/api/cloudinary", Cloudinary);
 app.use("/api/quiz-results", QuizResultRoute);
+app.use("/api/contact", ContactRoute);
 
 const port = process.env.PORT || 5000;
 // server.listen(port, () => {
