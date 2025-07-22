@@ -1,8 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const LessonController = require("../controller/LessonController");
+const { uploadLessonVideo } = require("../utils/multerConfig");
 
-router.post("/", LessonController.createLesson);
+// Use uploadLessonVideo for video uploads
+router.post(
+  "/",
+  uploadLessonVideo.single("video"),
+  LessonController.createLesson
+);
 router.get("/", LessonController.getLessons);
 router.get("/:id", LessonController.getLessonById);
 router.put("/:id", LessonController.updateLesson);

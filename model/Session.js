@@ -2,9 +2,14 @@ const mongoose = require("mongoose");
 
 const SessionSchema = new mongoose.Schema(
   {
-    bookingId: {
+    lessonId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
+      ref: "Lesson",
+      required: true,
+    },
+    courseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
       required: true,
     },
     tutorId: {
@@ -12,64 +17,46 @@ const SessionSchema = new mongoose.Schema(
       ref: "Tutor",
       required: true,
     },
-    studentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
-      required: true,
-    },
     roomId: {
       type: String,
-      required: true, // Jitsi Meet Room ID
+      required: false, // Jitsi/Zoom/other room ID
     },
-    date: {
+    scheduledDate: {
       type: Date,
       required: true,
     },
     startTime: {
       type: String,
-      required: true,
+      required: false,
     },
     endTime: {
-      type: String, 
-      default: null, // Will be set when session ends
+      type: String,
+      default: null,
     },
     duration: {
-      type: Number, 
-      default: 0, // Updated after the session ends
-    },
-    actualDuration: {
-      type: Number, // Actual calculated duration after session
-      default: 0,
+      type: Number,
+      default: 0, // in minutes or hours
     },
     status: {
       type: String,
       enum: ["scheduled", "in-progress", "completed", "canceled"],
       default: "scheduled",
     },
-    hourlyRate: {
-      type: Number,
-      required: true, 
-    },
-    totalFee: {
-      type: Number,
-      default: 0, 
-    },
-    platformFee: {
-      type: Number,
-      default: 0, 
-    },
-    tutorEarnings: {
-      type: Number,
-      default: 0, 
-    },
-    roomPassword:{
+    roomPassword: {
       type: String,
       default: null,
-    }
+    },
+    attendees: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Student",
+      },
+    ],
   },
   {
-    timestamps: true, 
+    timestamps: true,
   }
 );
 
-module.exports = mongoose.model("Session", SessionSchema);
+module.exports =
+  mongoose.models.Session || mongoose.model("Session", SessionSchema);

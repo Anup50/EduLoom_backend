@@ -3,18 +3,17 @@ const router = express.Router();
 // const upload = require("../utils/multerConfig");
 const { uploadStudent } = require("../utils/multerConfig");
 
-const {
-  authenticateToken,
-  authorizeRole,
-} = require("../security/Auth");
+const { authenticateToken, authorizeRole } = require("../security/Auth");
 const {
   getAllStudents,
   getStudentProfile,
+  getEnrolledCourses,
   updateStudentProfile,
 } = require("../controller/StudentController");
 
-router.get("/all", authenticateToken, authorizeRole("admin"), getAllStudents); 
-router.get("/profile", authenticateToken, getStudentProfile); 
+router.get("/all", authenticateToken, authorizeRole("admin"), getAllStudents);
+router.get("/profile", authenticateToken, getStudentProfile);
+router.get("/enrolled-courses", authenticateToken, getEnrolledCourses);
 router.put(
   "/profile",
   authenticateToken,

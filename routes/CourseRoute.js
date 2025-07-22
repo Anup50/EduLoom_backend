@@ -16,6 +16,12 @@ router.post(
 // Get all courses
 router.get("/", CourseController.getCourses);
 router.get("/tutor", authenticateToken, CourseController.getCoursesByTutor);
+// Get students enrolled in a course
+router.get(
+  "/:courseId/students",
+  authenticateToken,
+  CourseController.getCourseStudents
+);
 // Get a course by ID
 router.get("/:id", CourseController.getCourseById);
 // Update a course (only teachers)
@@ -32,6 +38,14 @@ router.delete(
   authenticateToken,
   authorizeRole("tutor"),
   CourseController.deleteCourse
+);
+
+// Toggle course completion status (only teachers)
+router.patch(
+  "/:id/toggle-completion",
+  authenticateToken,
+  authorizeRole("tutor"),
+  CourseController.toggleCourseCompletion
 );
 
 module.exports = router;
