@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const EnrollmentController = require("../controller/EnrollmentController");
-const { authenticateToken } = require("../security/Auth");
+const { authenticateToken } = require("../middleware/authMiddleware");
 
 router.post("/", authenticateToken, EnrollmentController.createEnrollment);
 router.get("/", EnrollmentController.getEnrollments);

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const NoteController = require("../controller/NoteController");
-const { authenticateToken } = require("../security/Auth");
+const { authenticateToken } = require("../middleware/authMiddleware");
 const validationMiddleware = require("../middleware/validationMiddleware");
 const noteValidation = require("../validation/NoteValidation");
 

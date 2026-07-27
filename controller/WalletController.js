@@ -1,6 +1,6 @@
 const { solar } = require("googleapis/build/src/apis/solar");
 const Transaction = require("../model/Transaction");
-const Student = require("../model/student");
+const Student = require("../model/Student");
 const axios = require("axios");
 const { sendNotification } = require("../utils/notifications");
 const KHALTI_SECRET = process.env.KHALTI_SECRET_KEY;

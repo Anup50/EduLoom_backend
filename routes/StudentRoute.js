@@ -3,7 +3,7 @@ const router = express.Router();
 // const upload = require("../utils/multerConfig");
 const { uploadStudent } = require("../utils/multerConfig");
 
-const { authenticateToken, authorizeRole } = require("../security/Auth");
+const { authenticateToken, authorizeRole } = require("../middleware/authMiddleware");
 const {
   getAllStudents,
   getStudentProfile,

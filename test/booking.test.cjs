@@ -4,8 +4,8 @@ const chaiHttp = require("chai-http");
 const mongoose = require("mongoose");
 const Booking = require("../model/Booking");
 const User = require("../model/User");
-const Tutor = require("../model/tutor");
-const Student = require("../model/student");
+const Tutor = require("../model/Tutor");
+const Student = require("../model/Student");
 
 chai.use(chaiHttp);
 const { expect } = chai;

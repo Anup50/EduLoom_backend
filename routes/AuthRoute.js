@@ -2,7 +2,7 @@ const express=require("express");
 const router=express.Router();
 const {register,login, verifyEmail, resendOTP, changePassword}=require("../controller/AuthController");
 const {uploadTutor} = require("../utils/multerConfig");
-const { authenticateToken, authorizeRole } = require("../security/Auth");
+const { authenticateToken, authorizeRole } = require("../middleware/authMiddleware");
 
 
 router.post("/register",uploadTutor.single("profileImage"),register);

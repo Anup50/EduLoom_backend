@@ -2,7 +2,7 @@ const { app } = require("../app.js");
 const chai = require("chai");
 const chaiHttp = require("chai-http");
 const mongoose = require("mongoose");
-const Tutor = require("../model/tutor");
+const Tutor = require("../model/Tutor");
 const User = require("../model/User");
 
 chai.use(chaiHttp);

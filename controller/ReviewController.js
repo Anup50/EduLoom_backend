@@ -1,6 +1,6 @@
 const Review = require("../model/Review");
-const Student = require("../model/student");
-const Tutor = require("../model/tutor");
+const Student = require("../model/Student");
+const Tutor = require("../model/Tutor");
 const User = require("../model/User");
 const { sendNotification } = require("../utils/notifications");
 const { date } = require("joi");

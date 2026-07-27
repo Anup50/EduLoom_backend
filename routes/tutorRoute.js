@@ -1,21 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const tutorController = require("../controller/tutorController");
-const { authenticateToken, authorizeRole } = require("../security/Auth");
+const TutorController = require("../controller/TutorController");
+const { authenticateToken, authorizeRole } = require("../middleware/authMiddleware");
 const { uploadTutor } = require("../utils/multerConfig");
 
-router.get("/", tutorController.getTutors);
-// router.post('/',upload.single('file'), tutorController.create);
-// router.get('/:id', tutorController.getById);
-// router.delete('/:id', authenticateToken,authorizeRole('admin'),tutorController.deleteById);
+router.get("/", TutorController.getTutors);
 router.put(
   "/update-profile",
   authenticateToken,
   uploadTutor.single("profileImage"),
-  tutorController.updateTutorProfile
+  TutorController.updateTutorProfile
 );
-router.get("/profile", authenticateToken, tutorController.getTutorProfile);
-
-router.get("/profile/:username", tutorController.getTutorByUsername);
+router.get("/profile", authenticateToken, TutorController.getTutorProfile);
+router.get("/profile/:username", TutorController.getTutorByUsername);
 
 module.exports = router;

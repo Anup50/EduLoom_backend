@@ -3,7 +3,7 @@ const cloudinary = require("../utils/cloudinary");
 const Tutor = require("../model/Tutor");
 const mongoose = require("mongoose");
 const Student = require("../model/Student");
-const Category = require("../model/Categories");
+const Category = require("../model/Category");
 
 exports.createCourse = async (req, res) => {
   try {

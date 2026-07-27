@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const CourseController = require("../controller/CourseController");
 const { uploadCourseImage } = require("../utils/multerConfig");
-const { authenticateToken, authorizeRole } = require("../security/Auth");
+const { authenticateToken, authorizeRole } = require("../middleware/authMiddleware");
 
 // Get all difficulties
 router.get("/difficulties", CourseController.getDifficulties);
