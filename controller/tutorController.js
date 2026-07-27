@@ -1,8 +1,6 @@
 const Tutor = require("../model/Tutor");
 const User = require("../model/User");
-
 const Course = require("../model/Course");
-const bcryptjs = require("bcryptjs");
 const cloudinary = require("../utils/cloudinary");
 const Enrollment = require("../model/Enrollment");
 
@@ -35,10 +33,10 @@ const getTutors = async (req, res) => {
       ];
     }
 
-    if (minHourlyRate)
-      query.hourlyRate = { ...query.hourlyRate, $gte: Number(minHourlyRate) };
-    if (maxHourlyRate)
-      query.hourlyRate = { ...query.hourlyRate, $lte: Number(maxHourlyRate) };
+    if (req.query.minHourlyRate)
+      query.hourlyRate = { ...query.hourlyRate, $gte: Number(req.query.minHourlyRate) };
+    if (req.query.maxHourlyRate)
+      query.hourlyRate = { ...query.hourlyRate, $lte: Number(req.query.maxHourlyRate) };
 
     if (minRating) query.rating = { ...query.rating, $gte: Number(minRating) };
     if (maxRating) query.rating = { ...query.rating, $lte: Number(maxRating) };
@@ -53,7 +51,6 @@ const getTutors = async (req, res) => {
 
     const tutors = await Tutor.find(query)
       .populate("userId", "name profileImage email")
-
       .sort(sortOptions)
       .skip((page - 1) * limit)
       .limit(Number(limit));
@@ -67,9 +64,7 @@ const getTutors = async (req, res) => {
       email: tutor.userId?.email,
       bio: tutor.bio,
       description: tutor.description,
-
       rating: tutor.rating,
-
       availability: tutor.availability,
     }));
 
@@ -122,7 +117,6 @@ const updateTutorProfile = async (req, res) => {
         folder: "tutor-profile-images",
       });
       updateFields.profileImage = uploadResult.secure_url;
-      console.log("uploadResult:", uploadResult);
     }
 
     const updatedTutor = await Tutor.findOneAndUpdate(
@@ -146,6 +140,7 @@ const updateTutorProfile = async (req, res) => {
     res.status(500).json({ message: "Failed to update tutor profile" });
   }
 };
+
 const getTutorProfile = async (req, res) => {
   try {
     const tutorId = req.user.id;
@@ -159,18 +154,15 @@ const getTutorProfile = async (req, res) => {
       return res.status(404).json({ message: "Tutor profile not found" });
     }
 
-    // Get all courses by this tutor
     const courses = await Course.find({ tutor: tutor._id });
     const coursesCount = courses.length;
 
-    // Get total unique students enrolled in tutor's courses
     const enrollments = await Enrollment.find({
       course: { $in: courses.map((course) => course._id) },
     }).distinct("student");
 
     const totalStudents = enrollments.length;
 
-    // Ensure arrays are properly handled
     const teachingInterests = Array.isArray(tutor.teachingIntrests)
       ? tutor.teachingIntrests.filter((interest) => interest)
       : [];
@@ -228,11 +220,9 @@ const getTutorByUsername = async (req, res) => {
       name: tutor.userId?.name || "N/A",
       profileImage: tutor.profileImage,
       bio: tutor.bio,
-
       description: tutor.description,
       hourlyRate: tutor.hourlyRate,
       rating: tutor.rating,
-      // subjects: tutor.subjects.map((subject) => subject.name),
       availability: tutor.availability,
     };
 

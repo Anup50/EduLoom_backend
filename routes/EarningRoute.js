@@ -1,7 +1,7 @@
 const express = require("express");
 const Earning = require("../model/Earning");
-const Tutor = require("../model/tutor");
-const { authenticateToken } = require("../security/Auth");
+const Tutor = require("../model/Tutor");
+const { authenticateToken } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 

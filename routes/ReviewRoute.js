@@ -3,7 +3,7 @@ const {
   giveReview,
   getReviewsByTutorUsername,
 } = require("../controller/ReviewController");
-const { authenticateToken } = require("../security/Auth");
+const { authenticateToken } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 

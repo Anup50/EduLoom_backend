@@ -1,6 +1,6 @@
 const express = require("express");
 const Notification = require("../model/Notification");
-const { authenticateToken } = require("../security/Auth");
+const { authenticateToken } = require("../middleware/authMiddleware");
 const { sendCourseNotification } = require("../utils/notifications");
 const Course = require("../model/Course");
 const Tutor = require("../model/Tutor");

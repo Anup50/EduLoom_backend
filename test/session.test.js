@@ -3,8 +3,8 @@ const chai = require("chai");
 const chaiHttp = require("chai-http");
 const mongoose = require("mongoose");
 const Session = require("../model/Session");
-const Tutor = require("../model/tutor");
-const Student = require("../model/student");
+const Tutor = require("../model/Tutor");
+const Student = require("../model/Student");
 
 chai.use(chaiHttp);
 const { expect } = chai;
